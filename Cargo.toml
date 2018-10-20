@@ -1,0 +1,16 @@
+[package]
+name = "ping"
+version = "0.1.0"
+authors = ["0xd34d10cc <0xd34d10cc@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = "0.1.0"
+tokio-signal = "0.2.5"
+tokio-icmp = "0.1.0"
+pnet_packet = "0.21.0"
+byteorder = "1.2.6"
+structopt = "0.2.12"
+
+[profile.release]
+lto = true
