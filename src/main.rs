@@ -8,6 +8,7 @@ use pnet_packet::icmp::echo_request;
 use pnet_packet::icmp::{Icmp, IcmpTypes};
 use structopt::StructOpt;
 use tokio::prelude::*;
+use tokio::runtime::current_thread::Runtime;
 use tokio::timer::Delay;
 use tokio_icmp::Socket as ICMPSocket;
 
@@ -77,18 +78,18 @@ impl Ping {
         let sockaddr = SocketAddrV4::new(host, 0);
         let socket = self.socket;
         let mut state = self.state;
-        state.last_packet_time = Instant::now();
 
         socket
             .send_to(packet, sockaddr.into())
             .map(move |(socket, _)| {
+                state.last_packet_time = Instant::now();
                 state.packets_sent += 1;
                 Ping { socket, state }
             })
     }
 
-    // waits for icmp echo reply from |host|
-    // FIXME: ignores sequence number
+    // wait for icmp echo reply from |host|
+    // FIXME: ignores sequence number and identification
     fn recv_from(self, host: Ipv4Addr) -> impl Future<Item = (Self, Icmp), Error = io::Error> {
         let state = self.state;
         let socket = self.socket;
@@ -114,7 +115,7 @@ impl Ping {
         stream::unfold(self, move |ping| {
             let host = host.clone();
 
-            let deadline = Instant::now() + Duration::from_millis(500);
+            let deadline = Instant::now() + Duration::from_secs(1);
             let fut = Delay::new(deadline)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
                 .and_then(move |_| ping.send_to(host.clone()))
@@ -161,7 +162,8 @@ fn run() -> io::Result<()> {
                 None => future::err(io::Error::new(io::ErrorKind::Other, "ctrl+c")),
             });
 
-    tokio::run(process_pings.map_err(|e| eprintln!("Whoops: {}", e)));
+    let mut runtime = Runtime::new()?;
+    runtime.block_on(process_pings)?;
 
     Ok(())
 }
